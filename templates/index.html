@@ -54,16 +54,15 @@
                         <!-- Display download link after comparison -->
                         {% if status == "success" %}
                         <div id="resultLinks" class='text-center mt-4'>
-                            {% for idx in range(processed_files|length) %}
+                            {% for file_name in processed_files %}
                             <div class='mt-2'>
-                                <p class='text-lg text-gray-700'>{{ processed_files[idx] }}</p>
+                                <p class='text-lg text-gray-700'>{{ file_name }}</p>
                                 <div class="flex gap-10 justify-center">
                                     <a href="#" id="previewLink" data-container-name="{{ container_name }}"
-                                        data-blob-name="{{ processed_files[idx] }}"
-                                        class='text-lg text-blue-500 hover:underline'>
+                                        data-blob-name="{{ file_name }}" class='text-lg text-blue-500 hover:underline'>
                                         Preview
                                     </a>
-                                    <a id="downloadLink" href="{{ download_links[idx] }}"
+                                    <a id="downloadLink" href="{{ download_links[file_name] }}"
                                         class='text-lg text-blue-500 hover:underline'>
                                         Download
                                     </a>
@@ -74,80 +73,82 @@
                         {% else %}
                         <h2>No processing files.</h2>
                         {% endif %}
+
                     </div>
-                </div>
 
-                <div id="tabContentCompare" class="tab-content hidden">
-                    <!-- Compare Form -->
-                    <div class='w-full h-full'>
-                        <form action="/compare" class="mt-10" method="post" enctype="multipart/form-data">
-                            <label htmlFor='uploadFileCompare' class='text-2xl font-semibold'>Compare File: </label>
-                            <div class='p-2 mt-1 bg-slate-200 border rounded h-36 w-full flex justify-center items-center'
-                                required>
-                                <label htmlFor='uploadFileCompare'>
-                                    <div class='justify-center items-center flex-col flex gap-2 cursor-pointer'>
-                                        <span class='text-5xl '><i class="fa-solid fa-upload"></i></span>
-                                        <p class='text-lg'>Upload File CSV,EXCEL</p>
-                                        <input type='file' id='uploadFileCompare' name="file[]" multiple class='hidden'>
-                                    </div>
-                                </label>
+                    <div id="tabContentCompare" class="tab-content hidden">
+                        <!-- Compare Form -->
+                        <div class='w-full h-full'>
+                            <form action="/compare" class="mt-10" method="post" enctype="multipart/form-data">
+                                <label htmlFor='uploadFileCompare' class='text-2xl font-semibold'>Compare File: </label>
+                                <div class='p-2 mt-1 bg-slate-200 border rounded h-36 w-full flex justify-center items-center'
+                                    required>
+                                    <label htmlFor='uploadFileCompare'>
+                                        <div class='justify-center items-center flex-col flex gap-2 cursor-pointer'>
+                                            <span class='text-5xl '><i class="fa-solid fa-upload"></i></span>
+                                            <p class='text-lg'>Upload File CSV,EXCEL</p>
+                                            <input type='file' id='uploadFileCompare' name="file[]" multiple
+                                                class='hidden'>
+                                        </div>
+                                    </label>
+                                </div>
+                                <div id="fileListCompare" class="file-list flex"></div>
+                                <div class='flex w-full justify-center items-center text-center mt-5'>
+                                    <button type="submit"
+                                        class='p-4 rounded-lg text-xl bg-red-500 text-white justify-center mb-10'>Compare</button>
+                                </div>
+                            </form>
+
+
+                            {% if status == 'success' %}
+                            <h3 class="font-medium">Comparison successful!</h3>
+                            <h2>File name: {{ blob_name }}</h2>
+                            <div class="flex gap-10">
+                                <a href="#" id="previewLink" data-container-name="{{ output_container_name }}"
+                                    data-blob-name="{{ blob_name }}"
+                                    class='text-lg text-blue-500 hover:underline font-semibold'>
+                                    Preview
+                                </a>
+                                {% for key, url in download_links.items() %}
+                                <a href="{{ url }}" class="text-blue-600 text-lg font-semibold hover:underline"
+                                    target="_blank">Download</a>
+                                {% endfor %}
                             </div>
-                            <div id="fileListCompare" class="file-list flex"></div>
-                            <div class='flex w-full justify-center items-center text-center mt-5'>
-                                <button type="submit"
-                                    class='p-4 rounded-lg text-xl bg-red-500 text-white justify-center mb-10'>Compare</button>
-                            </div>
-                        </form>
-
-
-                        {% if status == 'success' %}
-                        <h3 class="font-medium">Comparison successful!</h3>
-                        <h2>File name: {{ blob_name }}</h2>
-                        <div class="flex gap-10">
-                            <a href="#" id="previewLink" data-container-name="{{ output_container_name }}"
-                                data-blob-name="{{ blob_name }}"
-                                class='text-lg text-blue-500 hover:underline font-semibold'>
-                                Preview
-                            </a>
-                            {% for key, url in download_links.items() %}
-                            <a href="{{ url }}" class="text-blue-600 text-lg font-semibold hover:underline"
-                                target="_blank">Download</a>
-                            {% endfor %}
+                            {% elif status == 'error' %}
+                            <p>There was an error during the comparison process:</p>
+                            <p>{{ error_message }}</p>
+                            {% else %}
+                            <p>No file to display.</p>
+                            {% endif %}
                         </div>
-                        {% elif status == 'error' %}
-                        <p>There was an error during the comparison process:</p>
-                        <p>{{ error_message }}</p>
-                        {% else %}
-                        <p>No file to display.</p>
-                        {% endif %}
                     </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Preview Modal -->
-    <div id="previewBox" class="hidden flex fixed inset-0 bg-gray-800 bg-opacity-75 justify-center items-center z-50">
-        <div class="bg-white p-4 rounded max-w-[80%] w-full max-h-[80%] overflow-auto">
-            <div class="flex justify-between items-center mb-2">
-                <h2 class="text-xl font-semibold">Preview</h2>
-                <button id="closePreview" class="text-red-500">&times;</button>
-            </div>
-            <div class="tab overflow-x-auto overflow-y-auto">
-                <!-- Tab buttons -->
-                <!-- Tabs will be dynamically added here by JavaScript -->
-            </div>
-            <div id="previewContent" class="overflow-y-auto overflow-x-auto">
-                <!-- Tab content will be dynamically added here by JavaScript -->
-            </div>
-            <div class="flex justify-center gap-3 mt-4">
-                <button id="closePreviewBtn" class="bg-gray-500 text-white p-2 rounded">Close</button>
+        <!-- Preview Modal -->
+        <div id="previewBox"
+            class="hidden flex fixed inset-0 bg-gray-800 bg-opacity-75 justify-center items-center z-50">
+            <div class="bg-white p-4 rounded max-w-[80%] w-full max-h-[80%] overflow-auto">
+                <div class="flex justify-between items-center mb-2">
+                    <h2 class="text-xl font-semibold">Preview</h2>
+                    <button id="closePreview" class="text-red-500">&times;</button>
+                </div>
+                <div class="tab overflow-x-auto overflow-y-auto">
+                    <!-- Tab buttons -->
+                    <!-- Tabs will be dynamically added here by JavaScript -->
+                </div>
+                <div id="previewContent" class="overflow-y-auto overflow-x-auto">
+                    <!-- Tab content will be dynamically added here by JavaScript -->
+                </div>
+                <div class="flex justify-center gap-3 mt-4">
+                    <button id="closePreviewBtn" class="bg-gray-500 text-white p-2 rounded">Close</button>
+                </div>
             </div>
         </div>
-    </div>
 
 
-    <script src="/static/js/staticWeb.js"></script>
+        <script src="/static/js/staticWeb.js"></script>
 </body>
 
 </html>
