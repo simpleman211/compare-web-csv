@@ -484,3 +484,21 @@ document.addEventListener("DOMContentLoaded", function () {
     window.history.pushState({}, "", "/compare");
   });
 });
+// Code alert noflications when no file in form
+document.getElementById("processForm").addEventListener("submit", function(e) {
+  const fileInput = document.getElementById("uploadFileProcess")
+
+  if(fileInput.files.length === 0) {
+    e.preventDefault();
+    alert("Please select at least one file to process");
+  }
+})
+
+document.getElementById("compareForm").addEventListener("submit", function(e) {
+  const fileInput = document.getElementById("uploadFileCompare")
+
+  if(fileInput.files.length === 0) {
+    e.preventDefault();
+    alert("Please select at least one file to compare");
+  }
+})

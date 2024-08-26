@@ -54,167 +54,171 @@ def allowed_file(filename):
 def home():
     return render_template('index.html')
 
-@app.route('/process', methods=['POST'])
+@app.route('/process', methods=['POST','GET'])
 def upload():
-    if 'file[]' not in request.files:
-        return 'No file part'
+    if request.method == 'POST':
+        if 'file[]' not in request.files:
+            return 'No file part'
+        
+        files = request.files.getlist('file[]')
+        if not files:
+            return 'No files selected'
     
-    files = request.files.getlist('file[]')
-    if not files:
-        return 'No files selected'
-   
-    file_paths = {}
-    processCSV = ProcessCSV_EXCEL(constr)
+        file_paths = {}
+        processCSV = ProcessCSV_EXCEL(constr)
 
-    for file in files:
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            blob_client = blob_service_client.get_blob_client(container="uploads", blob=filename)
-            blob_client.upload_blob(file,overwrite=True)
-            file_paths[filename] = filename
+        for file in files:
+            if file and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                blob_client = blob_service_client.get_blob_client(container="uploads", blob=filename)
+                blob_client.upload_blob(file,overwrite=True)
+                file_paths[filename] = filename
 
-    if not file_paths:
-        return 'No valid files to process'
-    file_name = []
-    for file_path in file_paths:
+        if not file_paths:
+            return 'No valid files to process'
+        file_name = []
+        for file_path in file_paths:
+            try:
+                file_name_text = os.path.splitext(file_path)[0].split('\\')[-1]
+                file_name.append(file_name_text)
+            except Exception as e:
+                print(f"Error processing {file_path}: {e}")
+
+        combined_file_names = ' '.join(file_name).split()  
+        temp_files = []
+        
         try:
-            file_name_text = os.path.splitext(file_path)[0].split('\\')[-1]
-            file_name.append(file_name_text)
+            for i, (original_file, processed_file) in enumerate(file_paths.items()):
+                try:
+                    # Tạo Blob client để tải file từ container 'uploads'
+                    blob_client = blob_service_client.get_blob_client(container="uploads", blob=original_file)
+                    
+                    # Tải file từ Blob Storage về bộ nhớ tạm
+                    download_stream = blob_client.download_blob()
+                    file_content = io.BytesIO(download_stream.readall())
+                    file_content.seek(0)
+                    
+                    # Lấy đuôi file từ tên blob
+                    _, file_extension = os.path.splitext(original_file)
+                    
+                    # Xác định tên tệp tạm từ danh sách combined_file_names hoặc tạo tên mới
+                    if i < len(combined_file_names):
+                        temp_file_name = combined_file_names[i] + file_extension
+                    else:
+                        temp_file_name = f"temp_{i}{file_extension}"
+                    
+                    # Tạo đường dẫn tệp tạm
+                    temp_file_path = os.path.join(tempfile.gettempdir(), temp_file_name)
+                    
+                    # Tạo tệp tạm với tên cụ thể và lưu vào danh sách
+                    with open(temp_file_path, 'wb') as temp_file:
+                        temp_file.write(file_content.getvalue())
+                        temp_files.append(temp_file_path)
+                except Exception as e:
+                    print(f"Error processing upload {original_file}: {e}")
+            # Sau khi tất cả file tạm đã được tạo, gọi phương thức last_save với danh sách file tạm
+            processed_data = processCSV.last_save(temp_files)
+            print(processed_data)
+            # Xóa các file t
+            for temp_file in temp_files:
+                print(temp_file)
+                try:
+                    if os.path.exists(temp_file):
+                        os.remove(temp_file)
+                    else:
+                        print(f"Tệp tạm {temp_file} không tồn tại.")
+                except Exception as e:
+                    print(f"Không thể xóa tệp tạm {temp_file}: {e}")
+                    
         except Exception as e:
-            print(f"Error processing {file_path}: {e}")
-
-    combined_file_names = ' '.join(file_name).split()  
-    temp_files = []
-    
-    try:
-        for i, (original_file, processed_file) in enumerate(file_paths.items()):
-            try:
-                # Tạo Blob client để tải file từ container 'uploads'
-                blob_client = blob_service_client.get_blob_client(container="uploads", blob=original_file)
-                
-                # Tải file từ Blob Storage về bộ nhớ tạm
-                download_stream = blob_client.download_blob()
-                file_content = io.BytesIO(download_stream.readall())
-                file_content.seek(0)
-                
-                # Lấy đuôi file từ tên blob
-                _, file_extension = os.path.splitext(original_file)
-                
-                # Xác định tên tệp tạm từ danh sách combined_file_names hoặc tạo tên mới
-                if i < len(combined_file_names):
-                    temp_file_name = combined_file_names[i] + file_extension
-                else:
-                    temp_file_name = f"temp_{i}{file_extension}"
-                
-                # Tạo đường dẫn tệp tạm
-                temp_file_path = os.path.join(tempfile.gettempdir(), temp_file_name)
-                
-                # Tạo tệp tạm với tên cụ thể và lưu vào danh sách
-                with open(temp_file_path, 'wb') as temp_file:
-                    temp_file.write(file_content.getvalue())
-                    temp_files.append(temp_file_path)
-            except Exception as e:
-                print(f"Error processing upload {original_file}: {e}")
-        # Sau khi tất cả file tạm đã được tạo, gọi phương thức last_save với danh sách file tạm
-        processed_data = processCSV.last_save(temp_files)
-        print(processed_data)
-        # Xóa các file t
-        for temp_file in temp_files:
-            print(temp_file)
-            try:
-                if os.path.exists(temp_file):
-                    os.remove(temp_file)
-                else:
-                    print(f"Tệp tạm {temp_file} không tồn tại.")
-            except Exception as e:
-                print(f"Không thể xóa tệp tạm {temp_file}: {e}")
-                
-    except Exception as e:
-        print(f"Error during the overall processing: {e}")
-    return render_template('index.html', 
-        status=processed_data['status'],
-        processed_files=processed_data['processed_files'], 
-        download_links=processed_data['download_links'],
-        container_name=processed_data['container_name'],
-        output_file=processed_data['output_file'])
+            print(f"Error during the overall processing: {e}")
+        return render_template('index.html', 
+            status=processed_data['status'],
+            processed_files=processed_data['processed_files'], 
+            download_links=processed_data['download_links'],
+            container_name=processed_data['container_name'],
+            output_file=processed_data['output_file'])
+    return render_template('index.html')
    
-@app.route('/compare', methods=['POST'])
+@app.route('/compare', methods=['POST','GET'])
 def compare():
-    if 'file[]' not in request.files:
-        return 'No file part'
-    
-    files = request.files.getlist('file[]')
-    if not files:
-        return 'No files selected'
-    file_paths = {}
-    compare_files = CompareCSV_EXECL(constr)
-    for file in files:
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            blob_client = blob_service_client.get_blob_client(container="uploads", blob=filename)
-            blob_client.upload_blob(file,overwrite=True)
-            file_paths[filename] = filename
+    if request.method == 'POST':
+        if 'file[]' not in request.files:
+            return 'No file part'
+        
+        files = request.files.getlist('file[]')
+        if not files:
+            return 'No files selected'
+        file_paths = {}
+        compare_files = CompareCSV_EXECL(constr)
+        for file in files:
+            if file and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                blob_client = blob_service_client.get_blob_client(container="uploads", blob=filename)
+                blob_client.upload_blob(file,overwrite=True)
+                file_paths[filename] = filename
 
-    if not file_paths:
-        return 'No valid files to process'
-    file_name = []
-    for file_path in file_paths:
+        if not file_paths:
+            return 'No valid files to process'
+        file_name = []
+        for file_path in file_paths:
+            try:
+                file_name_text = os.path.splitext(file_path)[0].split('\\')[-1]
+                file_name.append(file_name_text)
+            except Exception as e:
+                print(f"Error processing {file_path}: {e}")
+
+        combined_file_names = ' '.join(file_name).split()  
+        temp_files = []
+
         try:
-            file_name_text = os.path.splitext(file_path)[0].split('\\')[-1]
-            file_name.append(file_name_text)
+            for i, (original_file, processed_file) in enumerate(file_paths.items()):
+                try:
+                    # Tạo Blob client để tải file từ container 'uploads'
+                    blob_client = blob_service_client.get_blob_client(container="uploads", blob=original_file)
+                    
+                    # Tải file từ Blob Storage về bộ nhớ tạm
+                    download_stream = blob_client.download_blob()
+                    file_content = io.BytesIO(download_stream.readall())
+                    file_content.seek(0)
+                    
+                    # Lấy đuôi file từ tên blob
+                    _, file_extension = os.path.splitext(original_file)
+                    
+                    # Xác định tên tệp tạm từ danh sách combined_file_names hoặc tạo tên mới
+                    if i < len(combined_file_names):
+                        temp_file_name = combined_file_names[i] + file_extension
+                    else:
+                        temp_file_name = f"temp_{i}{file_extension}"
+                    
+                    # Tạo đường dẫn tệp tạm
+                    temp_file_path = os.path.join(tempfile.gettempdir(), temp_file_name)
+                    
+                    # Tạo tệp tạm với tên cụ thể và lưu vào danh sách
+                    with open(temp_file_path, 'wb') as temp_file:
+                        temp_file.write(file_content.getvalue())
+                        temp_files.append(temp_file_path)
+                except Exception as e:
+                    print(f"Error processing upload {original_file}: {e}")
+            compare_data = compare_files.compare_costs(temp_files)
+            for temp_file in temp_files:
+                print(temp_file)
+                try:
+                    if os.path.exists(temp_file):
+                        os.remove(temp_file)
+                    else:
+                        print(f"Tệp tạm {temp_file} không tồn tại.")
+                except Exception as e:
+                    print(f"Không thể xóa tệp tạm {temp_file}: {e}")
+            print(compare_data)
         except Exception as e:
-            print(f"Error processing {file_path}: {e}")
-
-    combined_file_names = ' '.join(file_name).split()  
-    temp_files = []
-
-    try:
-        for i, (original_file, processed_file) in enumerate(file_paths.items()):
-            try:
-                # Tạo Blob client để tải file từ container 'uploads'
-                blob_client = blob_service_client.get_blob_client(container="uploads", blob=original_file)
-                
-                # Tải file từ Blob Storage về bộ nhớ tạm
-                download_stream = blob_client.download_blob()
-                file_content = io.BytesIO(download_stream.readall())
-                file_content.seek(0)
-                
-                # Lấy đuôi file từ tên blob
-                _, file_extension = os.path.splitext(original_file)
-                
-                # Xác định tên tệp tạm từ danh sách combined_file_names hoặc tạo tên mới
-                if i < len(combined_file_names):
-                    temp_file_name = combined_file_names[i] + file_extension
-                else:
-                    temp_file_name = f"temp_{i}{file_extension}"
-                
-                # Tạo đường dẫn tệp tạm
-                temp_file_path = os.path.join(tempfile.gettempdir(), temp_file_name)
-                
-                # Tạo tệp tạm với tên cụ thể và lưu vào danh sách
-                with open(temp_file_path, 'wb') as temp_file:
-                    temp_file.write(file_content.getvalue())
-                    temp_files.append(temp_file_path)
-            except Exception as e:
-                print(f"Error processing upload {original_file}: {e}")
-        compare_data = compare_files.compare_costs(temp_files)
-        for temp_file in temp_files:
-            print(temp_file)
-            try:
-                if os.path.exists(temp_file):
-                    os.remove(temp_file)
-                else:
-                    print(f"Tệp tạm {temp_file} không tồn tại.")
-            except Exception as e:
-                print(f"Không thể xóa tệp tạm {temp_file}: {e}")
-        print(compare_data)
-    except Exception as e:
-        print(f"Error during the overall processing: {e}")
-    return render_template('index.html',
-                           status=compare_data['status'],
-                            blob_name=compare_data['blob_name'],
-                            download_links=compare_data['download_links'],
-                            output_container_name=compare_data['container_name'])
+            print(f"Error during the overall processing: {e}")
+        return render_template('index.html',
+                            status=compare_data['status'],
+                                blob_name=compare_data['blob_name'],
+                                download_links=compare_data['download_links'],
+                                output_container_name=compare_data['container_name'])
+    return render_template('index.html')
 @app.route('/download/<filename>')
 def download(filename):
     file_path = os.path.join(app.config['PROCESS_FOLDER'], filename)
